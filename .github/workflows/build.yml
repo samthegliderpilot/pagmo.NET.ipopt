@@ -18,6 +18,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
+          submodules: recursive
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.x'
@@ -46,8 +53,14 @@ jobs:
           Copy-Item pagmoNet/native/win-build/PagmoWrapper.dll native/ -Force
         shell: pwsh
 
+      - name: Pack Pagmo.NET locally
+        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages --no-build-output /p:NoBuild=false
+        shell: pwsh
+
       - name: Build and test
-        run: dotnet test Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
+        run: |
+          $env:PATH = "$(Resolve-Path pagmoNet\native\win-build);$env:PATH"
+          dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
         shell: pwsh
 
   build-linux:
@@ -55,6 +68,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
+
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
           submodules: recursive
 
       - uses: actions/setup-dotnet@v4
@@ -65,7 +85,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential swig curl zip unzip tar \
-            autoconf autoconf-archive automake libtool powershell
+            autoconf autoconf-archive automake libtool
+
+      - name: Install PowerShell
+        run: |
+          source /etc/os-release
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O ms-prod.deb
+          sudo dpkg -i ms-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
 
       - name: Bootstrap vcpkg
         run: |
@@ -83,14 +111,26 @@ jobs:
       - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
 
+      - name: Pack Pagmo.NET locally
+        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages
+
       - name: Build and test
-        run: dotnet test Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
+        run: |
+          export LD_LIBRARY_PATH="$(pwd)/pagmoNet/native/build:$LD_LIBRARY_PATH"
+          dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
 
   build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
+
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
           submodules: recursive
 
       - uses: actions/setup-dotnet@v4
@@ -113,8 +153,13 @@ jobs:
           key: vcpkg-macos-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
           restore-keys: vcpkg-macos-ipopt-
 
-      - name: Build native (NLopt; IPOPT deferred on macOS)
+      - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
 
+      - name: Pack Pagmo.NET locally
+        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages
+
       - name: Build and test
-        run: dotnet test Pagmo.NET.Ipopt.csproj -p:PlatformTarget=AnyCPU --logger "console;verbosity=minimal"
+        run: |
+          export DYLD_LIBRARY_PATH="$(pwd)/pagmoNet/native/build:$DYLD_LIBRARY_PATH"
+          dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:PlatformTarget=AnyCPU --logger "console;verbosity=minimal"
