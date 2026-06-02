@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.0.0-beta.6</Version>
+    <PackageId>Pagmo.NET.Ipopt</PackageId>
+    <Description>Optional IPOPT (Interior Point OPTimizer) add-on for Pagmo.NET</Description>
+    <PackageLicenseExpression>LGPL-2.1-or-later</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/samthegliderpilot/pagmo.NET.ipopt</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pagmo.NET" Version="1.0.0-beta.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="generated\*.cs" />
+    <Compile Include="extensions\*.cs" />
+  </ItemGroup>
+
+</Project>
