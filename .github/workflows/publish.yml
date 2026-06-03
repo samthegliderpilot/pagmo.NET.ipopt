@@ -19,6 +19,7 @@ env:
 
 jobs:
 
+  # ── Windows: build native + pack NuGet + run tests ────────────────────────
   build-windows:
     runs-on: windows-latest
     steps:
@@ -48,8 +49,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/vcpkg/installed
-          key: vcpkg-windows-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
-          restore-keys: vcpkg-windows-ipopt-
+          key: vcpkg-windows-pagmonet-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-windows-pagmonet-ipopt-
+
+      - name: Resolve version
+        id: ver
+        run: |
+          $tag = $env:GITHUB_REF_NAME -replace '^v', ''
+          $manual = '${{ github.event.inputs.version }}'
+          $v = if ($manual) { $manual } else { $tag }
+          echo "VERSION=$v" >> $env:GITHUB_OUTPUT
+        shell: pwsh
 
       - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
@@ -59,15 +69,6 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force native | Out-Null
           Copy-Item pagmoNet/native/win-build/PagmoWrapper.dll native/ -Force
-        shell: pwsh
-
-      - name: Resolve version
-        id: ver
-        run: |
-          $tag = $env:GITHUB_REF_NAME -replace '^v', ''
-          $manual = '${{ github.event.inputs.version }}'
-          $v = if ($manual) { $manual } else { $tag }
-          echo "VERSION=$v" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Pack Pagmo.NET locally
@@ -87,18 +88,159 @@ jobs:
       - name: Upload nupkg
         uses: actions/upload-artifact@v4
         with:
-          name: nupkg
+          name: nupkg-windows
           path: artifacts/Pagmo.NET.Ipopt.*.nupkg
 
-  release:
-    needs: build-windows
+  # ── Linux: build native + run tests ──────────────────────────────────────
+  build-linux:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential swig curl zip unzip tar \
+            autoconf autoconf-archive automake libtool
+
+      - name: Install PowerShell
+        run: |
+          source /etc/os-release
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O ms-prod.deb
+          sudo dpkg -i ms-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
+      - name: Bootstrap vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg ~/vcpkg --depth 1
+          ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+
+      - name: Cache vcpkg installed
+        uses: actions/cache@v4
+        with:
+          path: ~/vcpkg/installed
+          key: vcpkg-linux-pagmonet-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-linux-pagmonet-ipopt-
+
+      - name: Build native with IPOPT
+        run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-linux
+          path: pagmoNet/native/build/libPagmoWrapper.so
+
+  # ── macOS: build arm64 + x86_64 universal binary ─────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Install build tools
+        run: brew install autoconf autoconf-archive automake libtool swig powershell
+
+      - name: Bootstrap vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg ~/vcpkg --depth 1
+          ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+
+      - name: Cache vcpkg installed
+        uses: actions/cache@v4
+        with:
+          path: ~/vcpkg/installed
+          key: vcpkg-macos-pagmonet-ipopt-universal-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-macos-pagmonet-ipopt-universal-
+
+      - name: Build arm64 slice (native with IPOPT)
+        run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
+
+      - name: Copy arm64 slice
+        run: cp pagmoNet/native/build/libPagmoWrapper.dylib libPagmoWrapper-arm64.dylib
+
+      - name: Install x86_64 vcpkg packages
+        run: |
+          $HOME/vcpkg/vcpkg install "pagmo2[nlopt]:x64-osx-static-pic" \
+            "--overlay-triplets=triplets/" \
+            "--overlay-ports=ports/" \
+            "--recurse"
+
+      - name: Build x86_64 slice
+        run: |
+          cmake \
+            -B pagmoNet/native/build-x64 \
+            -S pagmoNet/native \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=x64-osx-static-pic \
+            -DVCPKG_OVERLAY_TRIPLETS=pagmoNet/triplets/ \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DPAGMONET_WITH_NLOPT=ON
+          cmake --build pagmoNet/native/build-x64 --config Release
+
+      - name: Create universal binary
+        run: |
+          lipo -create \
+            libPagmoWrapper-arm64.dylib \
+            pagmoNet/native/build-x64/libPagmoWrapper.dylib \
+            -output libPagmoWrapper.dylib
+          codesign --sign - libPagmoWrapper.dylib
+          lipo -info libPagmoWrapper.dylib
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-macos-universal
+          path: libPagmoWrapper.dylib
+
+  # ── Publish: inject natives into nupkg, create release, push to NuGet ────
+  publish:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.x'
+
+      - name: Install PowerShell
+        run: |
+          source /etc/os-release
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O ms-prod.deb
+          sudo dpkg -i ms-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
 
       - name: Resolve version
         id: ver
@@ -109,16 +251,51 @@ jobs:
           echo "VERSION=$v" >> $env:GITHUB_OUTPUT
         shell: pwsh
 
-      - name: Download nupkg
+      - name: Download Windows nupkg
         uses: actions/download-artifact@v4
         with:
-          name: nupkg
+          name: nupkg-windows
           path: artifacts/
+
+      - name: Download Linux native
+        uses: actions/download-artifact@v4
+        with:
+          name: native-linux
+          path: native-linux/
+
+      - name: Download macOS universal native
+        uses: actions/download-artifact@v4
+        with:
+          name: native-macos-universal
+          path: native-macos/
+
+      - name: Inject Linux .so and macOS .dylib into nupkg
+        run: |
+          Add-Type -AssemblyName "System.IO.Compression"
+          Add-Type -AssemblyName "System.IO.Compression.FileSystem"
+          $nupkg = "artifacts/Pagmo.NET.Ipopt.${{ steps.ver.outputs.VERSION }}.nupkg"
+          $zip = [System.IO.Compression.ZipFile]::Open($nupkg, [System.IO.Compression.ZipArchiveMode]::Update)
+          try {
+            foreach ($entry in @(
+              @{ file = "native-linux/libPagmoWrapper.so";    path = "runtimes/linux-x64/native/libPagmoWrapper.so" },
+              @{ file = "native-macos/libPagmoWrapper.dylib"; path = "runtimes/osx/native/libPagmoWrapper.dylib" }
+            )) {
+              $existing = $zip.GetEntry($entry.path)
+              if ($existing) { $existing.Delete() }
+              [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zip, $entry.file, $entry.path,
+                [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+              Write-Host "Injected $($entry.path)"
+            }
+          } finally {
+            $zip.Dispose()
+          }
+        shell: pwsh
 
       - name: Upload assembled nupkg (for inspection)
         uses: actions/upload-artifact@v4
         with:
-          name: nupkg-final
+          name: package-final
           path: artifacts/Pagmo.NET.Ipopt.${{ steps.ver.outputs.VERSION }}.nupkg
 
       - name: Create GitHub Release

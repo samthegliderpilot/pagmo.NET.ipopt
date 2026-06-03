@@ -40,8 +40,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:/vcpkg/installed
-          key: vcpkg-windows-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
-          restore-keys: vcpkg-windows-ipopt-
+          key: vcpkg-windows-pagmonet-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-windows-pagmonet-ipopt-
 
       - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
@@ -54,10 +54,10 @@ jobs:
         shell: pwsh
 
       - name: Pack Pagmo.NET locally
-        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages --no-build-output /p:NoBuild=false
+        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages -c Release
         shell: pwsh
 
-      - name: Build and test
+      - name: Run tests
         run: |
           $env:PATH = "$(Resolve-Path pagmoNet\native\win-build);$env:PATH"
           dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
@@ -105,8 +105,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/vcpkg/installed
-          key: vcpkg-linux-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
-          restore-keys: vcpkg-linux-ipopt-
+          key: vcpkg-linux-pagmonet-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-linux-pagmonet-ipopt-
 
       - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
@@ -114,7 +114,7 @@ jobs:
       - name: Pack Pagmo.NET locally
         run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages
 
-      - name: Build and test
+      - name: Run tests
         run: |
           export LD_LIBRARY_PATH="$(pwd)/pagmoNet/native/build:$LD_LIBRARY_PATH"
           dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
@@ -150,8 +150,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/vcpkg/installed
-          key: vcpkg-macos-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
-          restore-keys: vcpkg-macos-ipopt-
+          key: vcpkg-macos-pagmonet-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-macos-pagmonet-ipopt-
 
       - name: Build native with IPOPT
         run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
@@ -159,7 +159,7 @@ jobs:
       - name: Pack Pagmo.NET locally
         run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages
 
-      - name: Build and test
+      - name: Run tests
         run: |
           export DYLD_LIBRARY_PATH="$(pwd)/pagmoNet/native/build:$DYLD_LIBRARY_PATH"
           dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:PlatformTarget=AnyCPU --logger "console;verbosity=minimal"
