@@ -113,4 +113,56 @@ public class IpoptSolverTest
         using var algo = new ipopt();
         Assert.Throws<NotSupportedException>(() => algo.set_seed(42u));
     }
+
+    // ── MUMPS-specific tests ──────────────────────────────────────────────────
+
+    [Test]
+    public void MumpsLinearSolverIsAvailable()
+    {
+        // Verifies that "mumps" is a valid option string — it throws if MUMPS
+        // was not compiled in (IPOPT would report Invalid_Option on evolve).
+        using var algo = new ipopt();
+        Assert.DoesNotThrow(() => algo.set_string_option("linear_solver", "mumps"),
+            "MUMPS must be a valid linear_solver option in this build");
+    }
+
+    [Test]
+    public void MumpsLinearSolverConverges()
+    {
+        // Red: with MA27 HSL loader this returned code=-12 and did not converge.
+        // Green: with MUMPS statically linked this must return code=0 and f<1e-6.
+        using var prob = new QuadraticProblem();
+        using var algo = new ipopt();
+        algo.set_string_option("linear_solver", "mumps");
+        algo.set_integer_option("print_level", 0);
+
+        using var pop = new population(prob, 1u, 42u);
+        using var evolved = algo.evolve(pop);
+
+        int code = algo.GetLastOptimizationResultCode();
+        double fBest = evolved.champion_f()[0];
+
+        Assert.That(code, Is.EqualTo(0),
+            $"MUMPS solver must report Solve_Succeeded (0); got {code}");
+        Assert.That(fBest, Is.LessThan(1e-6),
+            $"MUMPS solver must converge near f*=0; got f={fBest:F6}");
+    }
+
+    [Test]
+    public void MumpsLogLinesPopulatedAfterSolve()
+    {
+        // With MA27 the log was empty; MUMPS should produce iteration entries.
+        using var prob = new QuadraticProblem();
+        using var algo = new ipopt();
+        algo.set_string_option("linear_solver", "mumps");
+        algo.set_integer_option("print_level", 0);
+
+        using var pop = new population(prob, 1u, 42u);
+        using var _ = algo.evolve(pop);
+
+        var log = algo.GetTypedLogLines();
+        Assert.That(log, Is.Not.Null);
+        Assert.That(log.Count, Is.GreaterThan(0),
+            "MUMPS solve must produce log entries");
+    }
 }
