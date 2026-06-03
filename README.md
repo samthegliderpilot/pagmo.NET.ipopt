@@ -39,7 +39,7 @@ island.WaitCheck();
 | `tol` | numeric | Convergence tolerance (default `1e-8`) |
 | `max_iter` | integer | Maximum iterations (default `3000`) |
 | `print_level` | integer | Console verbosity 0–12 (default `5`) |
-| `linear_solver` | string | `ma27` (default), `ma57`, `ma86`, `ma97`, `pardiso` |
+| `linear_solver` | string | `mumps` (default when available), `ma27`, `ma57`, `ma86`, `ma97`, `pardiso` |
 | `hessian_approximation` | string | `exact` or `limited-memory` (L-BFGS) |
 
 ### Log extraction
@@ -55,8 +55,7 @@ int code = algo.GetLastOptimizationResultCode();
 
 ### Known limitations
 
-- The MA27 linear solver in this build uses IPOPT's HSL runtime-load model. On some platforms `GetLastOptimizationResultCode()` returns `-12` (Invalid_Option) even when the solve makes real progress — this is a known artefact of the HSL loader, not an indication that the solver failed.
-- MUMPS and SPRAL linear solvers are not included in this build.
+- SPRAL linear solver is not included in this build.
 
 ## License
 

@@ -63,23 +63,17 @@ public class IpoptSolverTest
         using var pop = new population(prob, 1u, 42u);
         double fInitial = pop.champion_f()[0];
 
-        // evolve() must not throw — IPOPT wiring is verified by it completing at all.
-        population evolved = null!;
-        Assert.DoesNotThrow(() => evolved = algo.evolve(pop),
-            "ipopt.evolve() must not throw");
+        using var evolved = algo.evolve(pop);
 
         Assert.That(evolved, Is.Not.Null, "evolve() must return a non-null population");
 
+        int resultCode = algo.GetLastOptimizationResultCode();
         double fBest = evolved.champion_f()[0];
 
-        // The solver must improve on the starting point — this is the core functional check.
-        // Note: the vcpkg MA27 runtime loader returns code=-12 (Invalid_Option) on this
-        // build, which is a known artefact of the HSL dynamic-load model; the solver still
-        // makes real progress as shown by the fitness improvement below.
-        Assert.That(fBest, Is.LessThan(fInitial),
-            $"IPOPT must improve on the starting point (initial f={fInitial:F4}, final f={fBest:F4})");
-
-        evolved.Dispose();
+        Assert.That(resultCode, Is.EqualTo(0).Or.EqualTo(1),
+            $"IPOPT must report Solve_Succeeded (0) or Solved_To_Acceptable_Level (1); got {resultCode}");
+        Assert.That(fBest, Is.LessThan(1e-6),
+            $"IPOPT must converge near f*=0 (initial f={fInitial:F4}, final f={fBest:F6}, code={resultCode})");
     }
 
     [Test]
