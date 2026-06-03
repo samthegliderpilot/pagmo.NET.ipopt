@@ -1,5 +1,8 @@
 bin/
 obj/
 *.user
-native/win-build/
-native/build/
+*.suo
+.vs/
+local-packages/
+native/
+.idea/

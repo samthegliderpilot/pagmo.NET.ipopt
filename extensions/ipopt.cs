@@ -4,19 +4,19 @@ using System.Collections.Generic;
 namespace pagmo;
 
 /// <summary>
-/// Represents ipopt. Uses pagmo-native semantics. See docs/api-reference.md for upstream links.
+/// Represents ipopt. Uses pagmo-native semantics. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
 /// </summary>
 public partial class ipopt : IAlgorithm
 {
     // IPOPT's return status is exposed as a numeric code to avoid leaking native pointer-style enums.
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public int GetLastOptimizationResultCode() => get_last_opt_result_code();
 
     // Keep pagmo-style naming for option setters while exposing C#-friendly primitives.
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public void set_integer_option(string name, ulong value) => set_integer_option_u64(name, value);
 
@@ -31,7 +31,7 @@ public partial class ipopt : IAlgorithm
         bool Feasible) : IAlgorithmLogLine
     {
         /// <summary>
-        /// Uses pagmo-native semantics. See docs/api-reference.md for upstream links.
+        /// Uses pagmo-native semantics. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
         /// </summary>
         public string AlgorithmName => "ipopt";
 
@@ -48,7 +48,7 @@ public partial class ipopt : IAlgorithm
         };
 
         /// <summary>
-        /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+        /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
         /// </summary>
         public string ToDisplayString()
             => $"obj_eval={ObjectiveEvaluations}, objective={Objective}, feasible={Feasible}";
@@ -56,19 +56,19 @@ public partial class ipopt : IAlgorithm
 
     // pagmo::ipopt does not expose a seed API in its wrapped surface.
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public void set_seed(uint seed) => throw new NotSupportedException("ipopt does not expose set_seed in pagmo.");
 
     // pagmo::ipopt does not expose a seed API in its wrapped surface.
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public uint get_seed() => throw new NotSupportedException("ipopt does not expose get_seed in pagmo.");
 
     // pagmo::ipopt exposes set_verbosity() but no getter in pagmo's public API.
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public uint get_verbosity() => throw new NotSupportedException("ipopt does not expose get_verbosity in pagmo.");
 
@@ -94,7 +94,7 @@ public partial class ipopt : IAlgorithm
     }
 
     /// <summary>
-    /// Invokes the corresponding pagmo API. See docs/api-reference.md for upstream links.
+    /// Invokes the corresponding pagmo API. See https://esa.github.io/pagmo2/docs/cpp/algorithms/ipopt.html for upstream API docs.
     /// </summary>
     public IReadOnlyList<IAlgorithmLogLine> GetLogLines()
     {

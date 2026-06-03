@@ -1,0 +1,140 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.0.0-beta.6) — overrides tag when run manually'
+        required: false
+      dry_run:
+        description: 'Build and test but skip GitHub Release and NuGet push'
+        type: boolean
+        default: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout Pagmo.NET
+        uses: actions/checkout@v4
+        with:
+          repository: samthegliderpilot/pagmo.NET
+          path: pagmo.NET
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Bootstrap vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg C:/vcpkg --depth 1
+          C:/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+          echo "VCPKG_ROOT=C:/vcpkg" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Cache vcpkg installed
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/installed
+          key: vcpkg-windows-ipopt-${{ hashFiles('pagmoNet/ports/**', 'ports/**', 'pagmoNet/native/CMakeLists.txt') }}
+          restore-keys: vcpkg-windows-ipopt-
+
+      - name: Build native with IPOPT
+        run: pwsh pagmoNet/scripts/build-native.ps1 -Configuration Release
+        shell: pwsh
+
+      - name: Copy DLL for tests
+        run: |
+          New-Item -ItemType Directory -Force native | Out-Null
+          Copy-Item pagmoNet/native/win-build/PagmoWrapper.dll native/ -Force
+        shell: pwsh
+
+      - name: Resolve version
+        id: ver
+        run: |
+          $tag = $env:GITHUB_REF_NAME -replace '^v', ''
+          $manual = '${{ github.event.inputs.version }}'
+          $v = if ($manual) { $manual } else { $tag }
+          echo "VERSION=$v" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Pack Pagmo.NET locally
+        run: dotnet pack pagmo.NET/Pagmo.NET/Pagmo.NET.csproj -o local-packages -c Release
+        shell: pwsh
+
+      - name: Pack Pagmo.NET.Ipopt
+        run: dotnet pack Pagmo.NET.Ipopt.csproj -o artifacts/ -c Release -p:Version=${{ steps.ver.outputs.VERSION }}
+        shell: pwsh
+
+      - name: Run tests
+        run: |
+          $env:PATH = "$(Resolve-Path pagmoNet\native\win-build);$env:PATH"
+          dotnet test Tests/Tests.Pagmo.NET.Ipopt.csproj -p:Platform=x64 --logger "console;verbosity=minimal"
+        shell: pwsh
+
+      - name: Upload nupkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/Pagmo.NET.Ipopt.*.nupkg
+
+  release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Resolve version
+        id: ver
+        run: |
+          $tag = $env:GITHUB_REF_NAME -replace '^v', ''
+          $manual = '${{ github.event.inputs.version }}'
+          $v = if ($manual) { $manual } else { $tag }
+          echo "VERSION=$v" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Download nupkg
+        uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/
+
+      - name: Upload assembled nupkg (for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg-final
+          path: artifacts/Pagmo.NET.Ipopt.${{ steps.ver.outputs.VERSION }}.nupkg
+
+      - name: Create GitHub Release
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "artifacts/Pagmo.NET.Ipopt.${{ steps.ver.outputs.VERSION }}.nupkg" \
+            --title "Pagmo.NET.Ipopt ${{ github.ref_name }}" \
+            --notes-file CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to NuGet.org
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        run: |
+          dotnet nuget push "artifacts/Pagmo.NET.Ipopt.${{ steps.ver.outputs.VERSION }}.nupkg" \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

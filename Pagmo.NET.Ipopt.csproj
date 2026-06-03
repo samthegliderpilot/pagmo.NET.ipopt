@@ -9,10 +9,20 @@
     <Description>Optional IPOPT (Interior Point OPTimizer) add-on for Pagmo.NET</Description>
     <PackageLicenseExpression>LGPL-2.1-or-later</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/samthegliderpilot/pagmo.NET.ipopt</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/samthegliderpilot/pagmo.NET.ipopt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Authors>samthegliderpilot</Authors>
+    <Copyright>Copyright © samthegliderpilot</Copyright>
+    <PackageTags>ipopt;optimization;nonlinear;constrained;gradient;pagmo;pagmo2</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
